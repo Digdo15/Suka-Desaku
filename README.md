@@ -3,195 +3,206 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Karya Makmur Super App</title>
-    
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
-
+    <title>Karya Makmur Pro - Server Jual Beli</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        :root { --p: #2ecc71; --d: #2c3e50; --bg: #f8f9fa; }
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: var(--bg); }
-        
-        /* Navigasi Bawah */
-        .bottom-nav { position: fixed; bottom: 0; width: 100%; background: white; display: flex; border-top: 1px solid #ddd; z-index: 1000; }
-        .nav-item { flex: 1; text-align: center; padding: 12px; font-size: 11px; cursor: pointer; color: #888; }
-        .nav-item.active { color: var(--p); font-weight: bold; }
-
-        /* Halaman */
-        .page { display: none; padding: 15px; padding-bottom: 80px; max-width: 500px; margin: 0 auto; }
-        .page.active { display: block; animation: fadeIn 0.3s; }
-        @keyframes fadeIn { from {opacity: 0;} to {opacity: 1;} }
-
-        header { background: var(--p); color: white; padding: 20px; border-radius: 0 0 20px 20px; text-align: center; margin: -15px -15px 15px -15px; }
-        
-        /* Produk */
-        .item-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .item-card { background: white; border-radius: 10px; overflow: hidden; border: 1px solid #eee; display: flex; flex-direction: column; }
-        .item-img { width: 100%; height: 110px; object-fit: cover; background: #eee; }
-        .item-info { padding: 8px; }
-        
-        /* Form & Button */
-        input, select, button { width: 100%; padding: 12px; margin-top: 8px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; }
-        .btn-p { background: var(--p); color: white; border: none; font-weight: bold; cursor: pointer; }
-        .btn-b { background: #3498db; color: white; border: none; }
-        
-        #map { height: 250px; width: 100%; border-radius: 10px; margin-top: 10px; }
-        .summary-box { background: #eef2f3; padding: 10px; border-radius: 8px; font-size: 13px; margin-top: 10px; }
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #f8fafc; }
     </style>
 </head>
-<body>
+<body class="p-4 md:p-8">
 
-    <div id="home" class="page active">
-        <header>
-            <h3 style="margin:0">Karya Makmur Market</h3>
-            <p style="font-size:11px">Belanja Mudah dari Rumah</p>
-        </header>
-        <div id="loader" style="text-align:center; padding:30px;">Memuat data...</div>
-        <div id="itemList" class="item-grid"></div>
-    </div>
+    <div class="max-w-7xl mx-auto">
+        <div class="flex flex-col md:flex-row justify-between items-center mb-10 gap-4">
+            <div class="flex items-center gap-4">
+                <div class="bg-blue-600 p-3 rounded-2xl shadow-lg text-white">
+                    <i class="fas fa-server fa-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-3xl font-bold text-slate-800">Karya Makmur <span class="text-blue-600 font-normal">SaaS</span></h1>
+                    <p id="lastUpdate" class="text-xs text-slate-500 font-medium italic">Menghubungkan ke Server...</p>
+                </div>
+            </div>
+            <div id="status" class="flex items-center gap-2 px-5 py-2 rounded-full bg-slate-200 text-slate-600 font-bold text-xs uppercase tracking-tighter transition-all">
+                Offline
+            </div>
+        </div>
 
-    <div id="delivery" class="page">
-        <h3>🛵 Pengiriman</h3>
-        <div class="summary-box" id="cartText">Keranjang belanja kosong.</div>
-        <button class="btn-b" onclick="getLocation()">📍 Klik Deteksi Lokasi</button>
-        <div id="map"></div>
-        <div id="ongkirRes" class="summary-box" style="display:none; background:#fff3cd;"></div>
-        <button id="btnWA" class="btn-p" style="background:#25D366; margin-top:15px;" onclick="sendToWA()" disabled>Pesan via WhatsApp</button>
-    </div>
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div class="lg:col-span-4">
+                <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm sticky top-8">
+                    <h3 class="font-bold text-slate-800 mb-6 flex items-center gap-2 text-lg">
+                        <i class="fas fa-cart-plus text-blue-600"></i> Kelola Transaksi
+                    </h3>
+                    <input type="hidden" id="rowIndex">
+                    <input type="hidden" id="currentID">
 
-    <div id="admin" class="page">
-        <h3>⚙️ Tambah Barang Baru</h3>
-        <div style="background:white; padding:15px; border-radius:10px;">
-            <input type="text" id="adm_toko" placeholder="Nama Toko">
-            <select id="adm_kat">
-                <option value="Hasil Alam">Hasil Alam</option>
-                <option value="Makanan">Makanan</option>
-                <option value="Minuman">Minuman</option>
-                <option value="Otomotif">Otomotif</option>
-            </select>
-            <input type="text" id="adm_nama" placeholder="Nama Produk">
-            <input type="number" id="adm_harga" placeholder="Harga (Misal: 25000)">
-            <input type="text" id="adm_foto" placeholder="Link Foto Produk">
-            <button id="btnSave" class="btn-p" onclick="saveToSheet()">Simpan ke Google Sheet</button>
+                    <div class="space-y-4">
+                        <div class="bg-slate-50 p-4 rounded-2xl">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase mb-2 block tracking-widest">Identitas Mitra</label>
+                            <input type="text" id="namaToko" placeholder="Nama Toko" class="w-full p-3 border rounded-xl text-sm mb-2 outline-none focus:ring-2 focus:ring-blue-500">
+                            <input type="text" id="pemilik" placeholder="Nama Pemilik" class="w-full p-3 border rounded-xl text-sm mb-2 outline-none">
+                            <input type="text" id="nomorHp" placeholder="Nomor WA (628...)" class="w-full p-3 border rounded-xl text-sm outline-none">
+                        </div>
+                        
+                        <div class="bg-blue-50/50 p-4 rounded-2xl border border-blue-100">
+                            <label class="text-[10px] font-bold text-blue-400 uppercase mb-2 block tracking-widest">Detail Barang & Harga</label>
+                            <input type="text" id="barang" placeholder="Nama Barang" class="w-full p-3 border rounded-xl text-sm mb-2 outline-none">
+                            <div class="grid grid-cols-2 gap-2 mb-2">
+                                <input type="number" id="hargaModal" placeholder="Harga Modal" class="p-3 border rounded-xl text-sm outline-none">
+                                <input type="number" id="hargaJual" placeholder="Harga Jual" class="p-3 border rounded-xl text-sm outline-none">
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <input type="text" id="jenis" placeholder="Kategori" class="p-3 border rounded-xl text-sm outline-none">
+                                <input type="number" id="terjual" placeholder="Qty Terjual" class="p-3 border rounded-xl text-sm outline-none">
+                            </div>
+                        </div>
+
+                        <textarea id="alamat" placeholder="Alamat Toko Lengkap" rows="2" class="w-full p-3 bg-slate-50 border rounded-2xl text-sm outline-none"></textarea>
+
+                        <button onclick="simpan()" id="btnSimpan" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-bold shadow-lg shadow-blue-100 transition-all flex justify-center items-center gap-3 active:scale-95">
+                            SIMPAN KE SERVER
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="lg:col-span-8">
+                <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="p-5 border-b flex justify-between items-center bg-white">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Database Transaksi</span>
+                        <button onclick="loadData()" class="text-blue-600 p-2 hover:bg-blue-50 rounded-lg transition-all"><i class="fas fa-sync-alt"></i> Refresh</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-widest border-b">
+                                <tr>
+                                    <th class="p-5">Barang</th>
+                                    <th class="p-5">Toko</th>
+                                    <th class="p-5 text-center">Terjual</th>
+                                    <th class="p-5 text-right">Harga Jual</th>
+                                    <th class="p-5 text-right">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dataTable" class="divide-y divide-slate-100 italic">
+                                <tr><td colspan="5" class="p-20 text-center text-slate-400">Memuat data dari server...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="bottom-nav">
-        <div class="nav-item active" onclick="nav('home', this)">Beranda</div>
-        <div class="nav-item" onclick="nav('delivery', this)">Antar</div>
-        <div class="nav-item" onclick="nav('admin', this)">Admin</div>
-    </div>
-
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
-
     <script>
-        // --- KONFIGURASI ---
-        const csvURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQjssXRMg7zBG3i7gXEwFBHUtGMb0DrvmSWaYnMaY6gmPFs9gNn---LoUx7S_jBwmErpYj5vXJdL3XV/pub?output=csv";
-        const scriptURL = "https://script.google.com/macros/s/AKfycbwrPd8M7PaKYIiqdLcP-RAQ5EN3M-2uyN-y_K4uiWGCr-FvTabnng9XNgVxni7l1dYI/exec";
-        const myWA = "6285841889968";
-        const tokoPos = [-2.9723, 104.7634]; // Ganti koordinat toko Anda
+        // MASUKKAN URL /exec ANDA DI SINI
+        const API_URL = "https://script.google.com/macros/s/AKfycbzYGra7liFKJm0e1XOz9zG28dih034kV8uPP26OA_Ac07zrfVg598vYIjTt01ACfRMfaw/exec";
 
-        let cart = { msg: "", total: 0, berat: 0 };
-        let userPos = null;
-        let finalOngkir = 0;
+        async function loadData() {
+            const statusEl = document.getElementById("status");
+            try {
+                const res = await fetch(API_URL);
+                const data = await res.json();
+                
+                statusEl.innerText = "Server: Online";
+                statusEl.className = "px-5 py-2 rounded-full bg-emerald-50 text-emerald-600 font-bold text-xs uppercase tracking-tighter shadow-sm border border-emerald-100 transition-all";
+                document.getElementById("lastUpdate").innerText = "Update: " + new Date().toLocaleTimeString();
 
-        // Ambil Data
-        function loadItems() {
-            Papa.parse(csvURL, {
-                download: true, header: true,
-                complete: function(res) {
-                    const list = document.getElementById('itemList');
-                    list.innerHTML = '';
-                    res.data.forEach(item => {
-                        if(!item.nama_produk) return;
-                        list.innerHTML += `
-                            <div class="item-card">
-                                <img src="${item.foto_produk || 'https://via.placeholder.com/150'}" class="item-img">
-                                <div class="item-info">
-                                    <div style="font-size:13px; font-weight:bold;">${item.nama_produk}</div>
-                                    <div style="color:green; font-size:12px;">Rp ${parseInt(item.harga_produk).toLocaleString()}</div>
-                                    <button onclick="add('${item.nama_produk}', ${item.harga_produk})" style="padding:5px; font-size:10px; background:#2ecc71; color:white; border:none; border-radius:4px; margin-top:5px; cursor:pointer;">Pilih</button>
-                                </div>
-                            </div>
-                        `;
-                    });
-                    document.getElementById('loader').style.display = 'none';
-                }
-            });
+                const tbody = document.getElementById("dataTable");
+                tbody.innerHTML = "";
+
+                data.slice().reverse().forEach((d) => {
+                    if(!d["Barang dijual"]) return;
+                    tbody.innerHTML += `
+                    <tr class="hover:bg-blue-50/50 transition">
+                        <td class="p-5">
+                            <div class="font-bold text-slate-800">${d["Barang dijual"]}</div>
+                            <div class="text-[10px] text-slate-400 italic">ID: ${d["ID"] || '-'}</div>
+                        </td>
+                        <td class="p-5 font-semibold text-slate-600">${d["Nama Toko"] || '-'}</td>
+                        <td class="p-5 text-center"><span class="bg-blue-100 text-blue-600 px-3 py-1 rounded-full text-[10px] font-bold">${d["Terjual"] || 0} Unit</span></td>
+                        <td class="p-5 text-right font-bold text-emerald-600">Rp ${Number(d["Harga jual"] || 0).toLocaleString()}</td>
+                        <td class="p-5 text-right">
+                            <button class="bg-slate-100 p-2 rounded-lg text-slate-400 hover:bg-blue-600 hover:text-white transition shadow-sm"
+                            onclick='editData(${JSON.stringify(d)})'><i class="fas fa-edit"></i></button>
+                        </td>
+                    </tr>`;
+                });
+            } catch (e) {
+                statusEl.innerText = "Server: Offline";
+                statusEl.className = "px-5 py-2 rounded-full bg-red-50 text-red-600 font-bold text-xs uppercase tracking-tighter border border-red-100 transition-all";
+            }
         }
 
-        function add(name, price) {
-            cart.msg += `- ${name} (1x)\n`;
-            cart.total += parseInt(price);
-            cart.berat += 0.5; // Estimasi 0.5kg per item
-            document.getElementById('cartText').innerText = cart.msg + "\nSubtotal Barang: Rp " + cart.total.toLocaleString();
-            alert(name + " dipilih!");
-        }
-
-        function nav(id, el) {
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-            el.classList.add('active');
-            if(id === 'delivery') setTimeout(() => map.invalidateSize(), 200);
-        }
-
-        // Peta
-        const map = L.map('map').setView(tokoPos, 14);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-        L.marker(tokoPos).addTo(map).bindPopup("Toko");
-
-        function getLocation() {
-            navigator.geolocation.getCurrentPosition(p => {
-                userPos = [p.coords.latitude, p.coords.longitude];
-                L.Routing.control({
-                    waypoints: [L.latLng(tokoPos), L.latLng(userPos)],
-                    addWaypoints: false, draggableWaypoints: false, show: false
-                }).on('routesfound', function(e) {
-                    let dist = e.routes[0].summary.totalDistance / 1000;
-                    finalOngkir = (Math.ceil(dist) * 5000) + (cart.berat * 500);
-                    const res = document.getElementById('ongkirRes');
-                    res.style.display = 'block';
-                    res.innerHTML = `Jarak: ${dist.toFixed(1)} km <br> Ongkir: Rp ${finalOngkir.toLocaleString()} <br> <b>Total Bayar: Rp ${(cart.total + finalOngkir).toLocaleString()}</b>`;
-                    document.getElementById('btnWA').disabled = false;
-                }).addTo(map);
-            });
-        }
-
-        function sendToWA() {
-            const maps = `https://www.google.com/maps?q=${userPos[0]},${userPos[1]}`;
-            const text = `*PESANAN BARU*%0A${cart.msg}%0A---%0ATotal Barang: Rp ${cart.total.toLocaleString()}%0AOngkir: Rp ${finalOngkir.toLocaleString()}%0A*TOTAL BAYAR: Rp ${(cart.total + finalOngkir).toLocaleString()}*%0A%0ALokasi: ${maps}`;
-            window.open(`https://wa.me/${myWA}?text=${text}`);
-        }
-
-        // Simpan ke Sheet via Apps Script
-        function saveToSheet() {
-            const btn = document.getElementById('btnSave');
-            btn.innerText = "Mengirim..."; btn.disabled = true;
-
-            const data = {
-                id_toko: Date.now(),
-                nama_toko: document.getElementById('adm_toko').value,
-                kategori_segmen: document.getElementById('adm_kat').value,
-                nama_produk: document.getElementById('adm_nama').value,
-                harga_produk: document.getElementById('adm_harga').value,
-                foto_produk: document.getElementById('adm_foto').value
+        async function simpan() {
+            const btn = document.getElementById("btnSimpan");
+            
+            // Mengumpulkan data dari form
+            const payload = {
+                row_index: document.getElementById("rowIndex").value,
+                id: document.getElementById("currentID").value,
+                nama_toko: document.getElementById("namaToko").value,
+                pemilik: document.getElementById("pemilik").value,
+                nomor_hp: document.getElementById("nomorHp").value,
+                barang: document.getElementById("barang").value,
+                harga_modal: document.getElementById("hargaModal").value,
+                harga_jual: document.getElementById("hargaJual").value,
+                jenis: document.getElementById("jenis").value,
+                terjual: document.getElementById("terjual").value,
+                alamat: document.getElementById("alamat").value
             };
 
-            fetch(scriptURL, {
-                method: "POST",
-                body: JSON.stringify(data)
-            })
-            .then(() => {
-                alert("Berhasil! Data akan muncul dalam beberapa menit.");
-                location.reload();
-            })
-            .catch(() => alert("Gagal mengirim data."));
+            if (!payload.nama_toko || !payload.barang) return alert("Nama toko & barang wajib diisi!");
+
+            btn.disabled = true; 
+            btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Processing...`;
+
+            try {
+                // MENGGUNAKAN MODE NO-CORS AGAR TIDAK BLOKIR BROWSER
+                await fetch(API_URL, {
+                    method: "POST",
+                    mode: "no-cors",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+
+                // Karena no-cors tidak mengembalikan respon JSON, kita beri jeda lalu refresh
+                alert("Data Berhasil Dikirim ke Antrean Server!");
+                resetForm();
+                setTimeout(loadData, 2000); // Tunggu 2 detik agar Google Sheet memproses data
+            } catch (e) {
+                alert("Gagal koneksi ke server");
+            } finally {
+                btn.disabled = false; 
+                btn.innerText = "SIMPAN KE SERVER";
+            }
         }
 
-        loadItems();
+        function editData(d) {
+            document.getElementById("rowIndex").value = d.row_index;
+            document.getElementById("currentID").value = d["ID"];
+            document.getElementById("namaToko").value = d["Nama Toko"] || "";
+            document.getElementById("pemilik").value = d["Nama Penjual"] || d["pemilik"] || "";
+            document.getElementById("nomorHp").value = d["nomor hp pemilik toko"] || d["nomor_hp"] || "";
+            document.getElementById("barang").value = d["Barang dijual"] || "";
+            document.getElementById("hargaModal").value = d["Harga modal"] || "";
+            document.getElementById("hargaJual").value = d["Harga jual"] || "";
+            document.getElementById("jenis").value = d["Jenis"] || "";
+            document.getElementById("terjual").value = d["Terjual"] || "";
+            document.getElementById("alamat").value = d["Alamat toko"] || d["alamat"] || "";
+            
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+
+        function resetForm() {
+            document.getElementById("rowIndex").value = "";
+            document.getElementById("currentID").value = "";
+            document.querySelectorAll("input, textarea").forEach(e => e.value = "");
+        }
+
+        // Load data saat pertama kali dibuka
+        loadData();
     </script>
 </body>
 </html>
