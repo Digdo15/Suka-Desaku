@@ -1,1 +1,318 @@
-# Suka-Desaku
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pasar Digital Karya Makmur</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    
+    <style>
+        :root {
+            --primary: #2ecc71; --dark: #2c3e50; --bg: #f8f9fa;
+        }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding-bottom: 80px; }
+        
+        /* Header */
+        header { background: linear-gradient(135deg, #27ae60, #2980b9); color: white; padding: 20px; border-radius: 0 0 20px 20px; position: sticky; top: 0; z-index: 10; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .search-box input { width: 100%; padding: 12px; border-radius: 25px; border: none; margin-top: 10px; box-sizing: border-box; }
+        
+        /* Kategori Tabs (Scrollable) */
+        .category-scroll {
+            display: flex; overflow-x: auto; padding: 15px 20px; gap: 10px; -webkit-overflow-scrolling: touch;
+        }
+        .category-scroll::-webkit-scrollbar { display: none; }
+        .cat-chip {
+            background: white; padding: 8px 16px; border-radius: 20px; white-space: nowrap; font-size: 0.9rem; border: 1px solid #ddd; cursor: pointer; transition: 0.3s;
+        }
+        .cat-chip.active { background: var(--dark); color: white; border-color: var(--dark); }
+
+        /* Shop Grid */
+        .shop-container { padding: 10px 20px; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; }
+        .shop-card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); cursor: pointer; position: relative; }
+        .shop-card:active { transform: scale(0.98); }
+        .shop-img { height: 100px; display: flex; align-items: center; justify-content: center; font-size: 40px; background: #ecf0f1; }
+        .shop-info { padding: 10px; }
+        .shop-name { font-weight: bold; font-size: 0.9rem; color: var(--dark); margin-bottom: 5px;}
+        .shop-tag { font-size: 0.7rem; background: #eee; padding: 2px 6px; border-radius: 4px; color: #555; }
+        
+        /* Status Badge */
+        .badge-closed { position: absolute; top: 10px; right: 10px; background: red; color: white; padding: 2px 8px; font-size: 10px; border-radius: 10px; }
+
+        /* Loading Spinner */
+        #loader { text-align: center; padding: 20px; color: #777; }
+
+        /* Modal Styles */
+        .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); align-items: flex-end; justify-content: center; }
+        .modal-content { background-color: #fff; width: 100%; max-width: 500px; border-radius: 20px 20px 0 0; padding: 20px; max-height: 85vh; overflow-y: auto; animation: slideUp 0.3s; }
+        @keyframes slideUp { from {transform: translateY(100%);} to {transform: translateY(0);} }
+        .item-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px dashed #eee; padding-bottom: 10px; }
+        .btn-qty { width: 30px; height: 30px; border-radius: 50%; border: 1px solid #ddd; background: white; cursor: pointer; font-weight: bold; }
+        .checkout-bar { margin-top: 20px; background: #2c3e50; color: white; padding: 15px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h3>Desa Karya Makmur 🇮🇩</h3>
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="Cari barang atau toko..." onkeyup="filterShops()">
+        </div>
+    </header>
+
+    <div class="category-scroll">
+        <div class="cat-chip active" onclick="filterCategory('Semua', this)">Semua</div>
+        <div class="cat-chip" onclick="filterCategory('Makanan', this)">🍲 Makanan</div>
+        <div class="cat-chip" onclick="filterCategory('Minuman', this)">🥤 Minuman</div>
+        <div class="cat-chip" onclick="filterCategory('Hasil Alam', this)">🌾 Hasil Alam</div>
+        <div class="cat-chip" onclick="filterCategory('Otomotif', this)">🔧 Otomotif</div>
+    </div>
+
+    <div id="loader">Sedang mengambil data terbaru... 🔄</div>
+    <div class="shop-container" id="shopList"></div>
+
+    <div id="productModal" class="modal">
+        <div class="modal-content">
+            <div style="display:flex; justify-content:space-between;">
+                <h3 id="modalShopName" style="margin:0;">Nama Toko</h3>
+                <span onclick="closeModal()" style="font-size:24px; cursor:pointer;">&times;</span>
+            </div>
+            <p id="modalShopDesc" style="font-size:12px; color:#777; margin-bottom:15px;"></p>
+            
+            <div id="productList"></div>
+
+            <div class="checkout-bar" onclick="processCheckout()">
+                <div><small>Total:</small><br><strong id="totalPrice">Rp 0</strong></div>
+                <div style="font-weight: bold;">Pesan & Antar 🛵 ></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- KONFIGURASI GOOGLE SHEET ---
+        // Link CSV sudah diperbarui otomatis
+        const googleSheetURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQjssXRMg7zBG3i7gXEwFBHUtGMb0DrvmSWaYnMaY6gmPFs9gNn---LoUx7S_jBwmErpYj5vXJdL3XV/pub?output=csv"; 
+
+        // Variable Global
+        let allShops = []; // Data mentah dari sheet
+        let groupedShops = {}; // Data yang sudah dikelompokkan per toko
+        let currentCart = {};
+        let activeShopId = null;
+
+        // 1. Ambil Data dari Google Sheet
+        function loadData() {
+            Papa.parse(googleSheetURL, {
+                download: true,
+                header: true,
+                complete: function(results) {
+                    processData(results.data);
+                },
+                error: function(err) {
+                    document.getElementById('loader').innerText = "Gagal memuat data. Cek koneksi internet.";
+                }
+            });
+        }
+
+        // 2. Olah Data CSV menjadi Format Aplikasi
+        function processData(data) {
+            groupedShops = {};
+            
+            data.forEach(row => {
+                // Pastikan baris data valid (punya ID dan Nama Toko)
+                if(row.id_toko && row.nama_toko) {
+                    const id = row.id_toko;
+                    
+                    // Jika toko belum ada di list, buat baru
+                    if (!groupedShops[id]) {
+                        groupedShops[id] = {
+                            id: id,
+                            name: row.nama_toko,
+                            category: row.kategori_segmen || "Lainnya",
+                            desc: row.deskripsi_toko || "",
+                            isOpen: (row.status_buka && row.status_buka.toLowerCase() === 'true'),
+                            emoji: row.emoji || "🏪",
+                            products: []
+                        };
+                    }
+
+                    // Masukkan produk ke toko tersebut
+                    if(row.nama_produk) {
+                        groupedShops[id].products.push({
+                            name: row.nama_produk,
+                            price: parseInt(row.harga_produk) || 0
+                        });
+                    }
+                }
+            });
+
+            // Ubah object ke array agar mudah di-filter
+            allShops = Object.values(groupedShops);
+            
+            document.getElementById('loader').style.display = 'none';
+            renderShops(allShops);
+        }
+
+        // 3. Tampilkan Toko di Layar
+        const shopContainer = document.getElementById('shopList');
+
+        function renderShops(data) {
+            shopContainer.innerHTML = '';
+            
+            if(data.length === 0) {
+                shopContainer.innerHTML = '<p style="text-align:center;">Data kosong atau belum dimuat.</p>';
+                return;
+            }
+
+            data.forEach(shop => {
+                // Cek Status Buka/Tutup
+                const opacity = shop.isOpen ? '1' : '0.6';
+                const badge = shop.isOpen ? '' : '<div class="badge-closed">TUTUP</div>';
+                const clickAction = shop.isOpen ? `onclick="openShop('${shop.id}')"` : `onclick="alert('Maaf, toko ini sedang tutup.')"`;
+
+                shopContainer.innerHTML += `
+                    <div class="shop-card" style="opacity: ${opacity};" ${clickAction}>
+                        ${badge}
+                        <div class="shop-img">${shop.emoji}</div>
+                        <div class="shop-info">
+                            <div class="shop-name">${shop.name}</div>
+                            <span class="shop-tag">${shop.category}</span>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        // 4. Filter Kategori
+        function filterCategory(category, element) {
+            // Update tombol aktif
+            document.querySelectorAll('.cat-chip').forEach(el => el.classList.remove('active'));
+            element.classList.add('active');
+
+            if (category === 'Semua') {
+                renderShops(allShops);
+            } else {
+                // Filter case-insensitive (huruf besar/kecil tidak masalah)
+                const filtered = allShops.filter(s => s.category.toLowerCase().includes(category.toLowerCase()));
+                renderShops(filtered);
+            }
+        }
+
+        // 5. Pencarian
+        function filterShops() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = allShops.filter(s => 
+                s.name.toLowerCase().includes(query) || 
+                s.category.toLowerCase().includes(query) ||
+                s.products.some(p => p.name.toLowerCase().includes(query)) // Cari juga berdasarkan nama menu
+            );
+            renderShops(filtered);
+        }
+
+        // --- LOGIC MODAL & BELANJA ---
+        const modal = document.getElementById('productModal');
+        const productList = document.getElementById('productList');
+
+        function openShop(id) {
+            const shop = groupedShops[id];
+            activeShopId = id;
+            
+            document.getElementById('modalShopName').innerText = shop.name;
+            document.getElementById('modalShopDesc').innerText = shop.desc || "Silakan pilih pesanan Anda";
+            
+            currentCart = {}; 
+            renderProducts(shop);
+            updateTotal();
+            modal.style.display = "flex";
+        }
+
+        function closeModal() { modal.style.display = "none"; }
+
+        function renderProducts(shop) {
+            productList.innerHTML = '';
+            shop.products.forEach(prod => {
+                const qty = currentCart[prod.name] || 0;
+                productList.innerHTML += `
+                    <div class="item-row">
+                        <div style="flex:1;">
+                            <div style="font-weight:600;">${prod.name}</div>
+                            <div style="color:#2ecc71;">Rp ${prod.price.toLocaleString()}</div>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <button class="btn-qty" onclick="updateQty('${prod.name}', ${prod.price}, -1)">-</button>
+                            <span style="width:20px; text-align:center; font-weight:bold;">${qty}</span>
+                            <button class="btn-qty" onclick="updateQty('${prod.name}', ${prod.price}, 1)">+</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function updateQty(name, price, change) {
+            if (!currentCart[name]) currentCart[name] = 0;
+            currentCart[name] += change;
+            if (currentCart[name] < 0) currentCart[name] = 0;
+            
+            // Re-render
+            const shop = groupedShops[activeShopId];
+            renderProducts(shop);
+            updateTotal(shop);
+        }
+
+        function updateTotal(shop) {
+            const s = groupedShops[activeShopId];
+            let total = 0;
+            if(s) {
+                s.products.forEach(prod => {
+                    const qty = currentCart[prod.name] || 0;
+                    total += qty * prod.price;
+                });
+            }
+            document.getElementById('totalPrice').innerText = "Rp " + total.toLocaleString();
+        }
+
+        function processCheckout() {
+            const shop = groupedShops[activeShopId];
+            let orderText = `Halo ${shop.name}, saya mau pesan via Web:%0A`;
+            let estimatedWeight = 0;
+            let totalPrice = 0;
+            let hasItem = false;
+
+            shop.products.forEach(prod => {
+                const qty = currentCart[prod.name] || 0;
+                if (qty > 0) {
+                    orderText += `- ${prod.name} (${qty}x) \n`;
+                    totalPrice += qty * prod.price;
+                    
+                    // Logic estimasi berat sederhana
+                    if(prod.name.toLowerCase().includes("kg") || prod.name.toLowerCase().includes("liter")) {
+                        estimatedWeight += qty;
+                    } else if (shop.category.toLowerCase().includes("otomotif")) {
+                         estimatedWeight += (qty * 0.5); // Sparepart rata2
+                    } else {
+                        estimatedWeight += (qty * 0.2); // Makanan ringan
+                    }
+                    hasItem = true;
+                }
+            });
+
+            if (!hasItem) { alert("Pilih barang dulu!"); return; }
+
+            orderText += `\nTotal Harga Barang: Rp ${totalPrice.toLocaleString()}`;
+
+            // Kirim ke index.html
+            const params = new URLSearchParams();
+            params.append("pesanan", orderText);
+            params.append("berat", Math.ceil(estimatedWeight));
+            
+            window.location.href = `index.html?${params.toString()}`;
+        }
+
+        // Jalankan saat load
+        loadData();
+
+        // Tutup modal jika klik luar
+        window.onclick = function(event) {
+            if (event.target == modal) closeModal();
+        }
+    </script>
+</body>
+</html>
